@@ -1,21 +1,51 @@
 <?php 
 
-$show_result = false;
-$calc_data = ['v' => 0, 'i' => 0, 'r' => 0, 'p_w' => 0, 'p_kw' => 0];
+function calculateElectricityDetails($voltage, $current, $rate) {
+    // Basic power calculation: P = V * I
+    $powerWatts = $voltage * $current;
+    $powerKiloWatts = $powerWatts / 1000;
+    
+    // Rate conversion: Convert cents to RM
+    $rateRM = $rate / 100;
+
+    $schedule = [];
+
+    // Generate data for 24 hours
+    for ($hour = 1; $hour <= 24; $hour++) {
+        $energyConsumed = $powerKiloWatts * $hour;
+        $totalCost = $energyConsumed * $rateRM;
+
+        $schedule[] = [
+            'hour' => $hour,
+            'energy' => $energyConsumed,
+            'cost' => $totalCost
+        ];
+    }
+
+    return [
+        'summary' => [
+            'power_w' => $powerWatts,
+            'power_kw' => $powerKiloWatts,
+            'rate_rm' => $rateRM
+        ],
+        'hourly_data' => $schedule
+    ];
+}
+
+$viewData = null;
+$formValues = ['v' => '', 'i' => '', 'r' => ''];
 
 if (isset($_POST['calculate'])) {
-    $v = $_POST['voltage'];
-    $i = $_POST['current'];
-    $r = $_POST['rate']; // rate in cents
+    // Capture input values
+    $v = (float)$_POST['voltage'];
+    $i = (float)$_POST['current'];
+    $r = (float)$_POST['rate'];
 
-    $power_w = $v * $i;
-    $power_kw = $power_w / 1000; 
-    
-    $calc_data = [
-        'v' => $v, 'i' => $i, 'r' => $r, 
-        'p_w' => $power_w, 'p_kw' => $power_kw
-    ];
-    $show_result = true;
+    // Keep values in form for better UX
+    $formValues = ['v' => $v, 'i' => $i, 'r' => $r];
+
+    // EXECUTE THE FUNCTION
+    $viewData = calculateElectricityDetails($v, $i, $r);
 }
 ?>
 
@@ -24,102 +54,91 @@ if (isset($_POST['calculate'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Energy Forecaster</title>
+    <title>Electricity Bill Forecaster</title>
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f4f7f6; color: #2d3436; font-family: 'Inter', sans-serif; }
-        .card { border: none; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        .table-container { max-height: 600px; overflow-y: auto; border-radius: 8px; }
-        .highlight-row { background-color: #f0fff4 !important; font-weight: 600; }
-        .bg-success-gradient { 
-            background: linear-gradient(135deg, #28a745 0%, #218838 100%); 
-            color: white; 
-        }
+        body { background-color: #f8f9fa; color: #333; }
+        .main-card { border: none; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .table-container { border-radius: 10px; overflow: hidden; }
+        .result-header { background: #198754; color: white; border-radius: 10px; padding: 1.5rem; }
+        .highlight-row { background-color: #e9f7ef !important; }
     </style>
 </head>
-<body class="p-4">
+<body class="py-5">
 
 <div class="container">
-    <header class="text-center mb-5">
-        <h2 class="fw-bold text-primary">⚡ Energy Consumption Forecaster</h2>
-        <p class="text-muted">Analyze power costs over a 24-hour cycle</p>
-    </header>
-    
-    <div class="row g-4">
-        <div class="col-md-4">
-            <div class="card p-4 mb-3">
-                <h5 class="fw-bold mb-4">Device Settings</h5>
+    <div class="row justify-content-center">
+        <!-- Input Section -->
+        <div class="col-lg-4 mb-4">
+            <div class="card main-card p-4">
+                <h4 class="mb-4 fw-bold text-success">Calculate Cost</h4>
                 <form method="POST">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Voltage (V)</label>
-                        <input type="number" step="0.01" name="voltage" class="form-control form-control-lg" value="<?= $calc_data['v'] ?: '' ?>" placeholder="e.g. 240" required>
+                        <label class="form-label fw-semibold">Voltage (V)</label>
+                        <input type="number" step="any" name="voltage" class="form-control" value="<?= htmlspecialchars($formValues['v']) ?>" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Current (A)</label>
-                        <input type="number" step="0.01" name="current" class="form-control form-control-lg" value="<?= $calc_data['i'] ?: '' ?>" placeholder="e.g. 0.5" required>
+                        <label class="form-label fw-semibold">Current (A)</label>
+                        <input type="number" step="any" name="current" class="form-control" value="<?= htmlspecialchars($formValues['i']) ?>" required>
                     </div>
                     <div class="mb-4">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Rate (cents/kWh)</label>
-                        <input type="number" step="0.01" name="rate" class="form-control form-control-lg" value="<?= $calc_data['r'] ?: '' ?>" placeholder="e.g. 21.8" required>
+                        <label class="form-label fw-semibold">Current Rate (sen/kWh)</label>
+                        <input type="number" step="any" name="rate" class="form-control" value="<?= htmlspecialchars($formValues['r']) ?>" required>
                     </div>
-                    <button type="submit" name="calculate" class="btn btn-success w-100 fw-bold py-3 shadow">Calculate Schedule</button>
-                    <a href="index.php" class="btn btn-link w-100 mt-2 text-decoration-none text-muted small">Reset All</a>
+                    <button type="submit" name="calculate" class="btn btn-success w-100 py-2 fw-bold">Calculate</button>
                 </form>
             </div>
-
-            <?php if($show_result): ?>
-            <div class="card p-4 bg-success-gradient text-center shadow">
-                <small class="text-uppercase fw-bold" style="opacity: 0.8;">Current Power Load</small>
-                <h2 class="fw-bold mb-0 mt-1"><?= number_format($calc_data['p_kw'], 4) ?> kW</h2>
-                <p class="small mb-0" style="opacity: 0.7;"><?= number_format($calc_data['p_w'], 2) ?> Watts</p>
-            </div>
-            <?php endif; ?>
         </div>
 
-        <div class="col-md-8">
-            <div class="card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold mb-0">24-Hour Forecast Table</h5>
-                    <?php if($show_result): ?>
-                        <span class="badge bg-primary px-3 py-2">Rate: <?= $calc_data['r'] ?> cents</span>
-                    <?php endif; ?>
+        <!-- Output Section -->
+        <div class="col-lg-8">
+            <?php if ($viewData): ?>
+                <!-- Power Summary -->
+                <div class="result-header mb-4 shadow-sm">
+                    <div class="row text-center">
+                        <div class="col-md-6 border-end border-white border-opacity-25">
+                            <p class="small text-uppercase mb-1" style="opacity: 0.8;">Power Load</p>
+                            <h3><?= number_format($viewData['summary']['power_kw'], 5) ?> <small>kW</small></h3>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="small text-uppercase mb-1" style="opacity: 0.8;">Calculated Rate</p>
+                            <h3>RM <?= number_format($viewData['summary']['rate_rm'], 3) ?> <small>/kWh</small></h3>
+                        </div>
+                    </div>
                 </div>
-                
-                <?php if($show_result): ?>
-                <div class="table-container border">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-dark sticky-top">
-                            <tr>
-                                <th class="py-3 ps-3">Usage Duration</th>
-                                <th class="py-3 text-center">Energy (kWh)</th>
-                                <th class="py-3 text-end pe-3">Total Cost</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php 
-                            for ($hour = 1; $hour <= 24; $hour++) {
-                                $energy = ($calc_data['p_w'] * $hour) / 1000;
-                                $cost = $energy * ($calc_data['r'] / 100);
-                                $class = ($hour % 6 == 0) ? 'highlight-row' : '';
-                                
-                                echo "<tr class='$class'>";
-                                echo "<td class='ps-3 fw-medium'>Hour $hour</td>";
-                                echo "<td class='text-center'>" . number_format($energy, 3) . " kWh</td>";
-                                echo "<td class='text-end pe-3 fw-bold text-success'>RM " . number_format($cost, 2) . "</td>";
-                                echo "</tr>";
-                            }
-                            ?>
-                        </tbody>
-                    </table>
+
+                <!-- 24H Table -->
+                <div class="card main-card p-4">
+                    <h5 class="fw-bold mb-3">24-Hour Electricity Projection</h5>
+                    <div class="table-container border">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="ps-3"># Hour</th>
+                                    <th class="text-center">Energy (kWh)</th>
+                                    <th class="text-end pe-3">Total (RM)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($viewData['hourly_data'] as $item): ?>
+                                    <tr class="<?= ($item['hour'] % 6 == 0) ? 'highlight-row' : '' ?>">
+                                        <td class="ps-3"><?= $item['hour'] ?></td>
+                                        <td class="text-center"><?= number_format($item['energy'], 5) ?></td>
+                                        <td class="text-end pe-3 fw-bold text-success"><?= number_format($item['cost'], 2) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <?php else: ?>
-                <div class="text-center py-5 bg-light rounded border border-dashed">
-                    <div class="mb-3 display-6 text-muted">📊</div>
-                    <p class="fw-medium mb-0">No data to display</p>
-                    <p class="small text-muted">Fill in the settings and click calculate to see the forecast.</p>
+            <?php else: ?>
+                <div class="card main-card p-5 text-center bg-white border border-dashed">
+                    <div class="text-muted mb-3"><i class="display-1 opacity-25">⚡</i></div>
+                    <h5>No data to display</h5>
+                    <p class="text-muted">Enter voltage, current, and rate to generate the forecast.</p>
                 </div>
-                <?php endif; ?>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
